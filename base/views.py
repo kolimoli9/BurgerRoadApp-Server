@@ -11,9 +11,21 @@ from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.contrib.auth.models import User
-# Create your views here.
+from .models import Customer
+from telesign.messaging import MessagingClient
+import string
+from random import choice
+from .serializers import UserSerializer
+
+
+def id_generator():
+    chars = string.digits
+    random =  ''.join(choice(chars) for _ in range(4))
+    return random
+
 def hello(r):
     return HttpResponse("Hello",r)
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -21,24 +33,57 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['email'] = user.email        
         return token
+
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
 
+def getOTP(phone):
+    code=id_generator()
+    customer_id = "FDDA74F5-2436-422D-94B4-F75F4C8795D6"
+    api_key = "Ss/TO9V4jCcwpNCCUhb5PiZvj4eup5hcLEUHqWJ0Fju2qSJJ1Sp59MgcUsa9ihNqikj3O3rRIenNTv04rQNmyQ=="
+    phone_number = f"972{phone}"
+    message = f"Welcome to Burger Road App! \nYour one time only Verafication Code is: {code}"
+    message_type = "ARN"
+    messaging = MessagingClient(customer_id, api_key)
+    response = messaging.message(phone_number, message, message_type)
+    with open('temp.txt','w')as f:
+        f.write(code)
+        f.close()
+
+  
+# Added return userid for later adding phone
 @api_view(['POST'])
 def register(r):
     newUser = User.objects.create(username=r.data['username'],password=make_password(r.data['password']),email=r.data['email'])
-    with open('temp.txt','w')as f:
-        f.write(newUser.username)
-        f.close()    
-    return JsonResponse({'output':f"Welcome aboard {newUser.username} !"},safe=False)
+    Customer.objects.create(user=newUser)
+    return JsonResponse({'userid':newUser.id},safe=False)
 
 @api_view(['POST'])
-def verificationPhone(r):
+def verificationPhone(r,id):
+    phone = r.data['phone']
+    newphone=str(phone).replace('-','')
+    user = User.objects.get(id=id)
+    user.customer.phone = int(newphone)
+    user.customer.save() 
+    getOTP(newphone) 
+    userID = {"userID":user.id}  
+    return JsonResponse({"data":userID},safe=False)
+
+
+#  SAVING THE FEW FREE TEXTS...REMEMBER TO UNCOMMENT!
+@api_view(['POST'])
+def verify(r):
+    # return HttpResponse(200)
     with open('temp.txt','r')as f:
-        username=f.read()
-    user = User.objects.get(username=username)
-    print(user.customer)
-    user.customer.phone = r.data['phone']
-    print(user.customer)
-    user.save()    
-    return HttpResponse(200)
+        code1 = f.read()
+    code2 = r.data['code']
+    if code1==code2:
+        return HttpResponse(200)
+    else:
+        return HttpResponse(401)
+
+@api_view(['GET'])
+def getUserData(r,id):
+    user = User.objects.get(id=id)
+    data = UserSerializer(user)
+# Finish implementing the serializers code
