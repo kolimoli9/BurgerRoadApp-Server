@@ -2,11 +2,12 @@ from django.db import models
 from datetime import *
 from django.contrib.auth.models import User
 
-empty ={}
+# The customer fields is added to the User built-in table
 class Customer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     phone = models.FloatField(max_length=10,default=0)
     orders = models.JSONField(default=dict)
+
 
 class Orders(models.Model):
     user = models.ForeignKey(User,on_delete=models.CASCADE)
@@ -14,7 +15,7 @@ class Orders(models.Model):
     burgers = models.JSONField()
     appetizers = models.CharField(max_length=20,default='None')
     drinks = models.CharField(max_length=20,default='None')
-    paymeth = models.CharField(max_length=10,default='Unknown')
+    payment = models.CharField(max_length=10,default='Unknown')
     total = models.FloatField()
     timestamp = models.TimeField(auto_now=True)
     datestamp = models.DateField(auto_now=True)
